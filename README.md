@@ -1,6 +1,6 @@
 # LPコメント機能 - GitHub Pages 対応版
 
-クライアントがLP上でピン留めコメントを書いて、あなたが GitHub Issues に投稿できる仕組みです。
+LP上でピン留めコメントを書いて、GitHub Issues に投稿できる仕組みです。
 
 ## 仕組み
 
@@ -63,7 +63,7 @@ https://yifansun-ui.github.io/FS_Sticker/
 
 ## 使い方
 
-### クライアント側（LP）
+### LP
 
 1. **「💬 コメント追加」** をクリック
 2. **カーソルが十字になる**
@@ -73,7 +73,7 @@ https://yifansun-ui.github.io/FS_Sticker/
 6. ピンをクリックして内容確認・削除可能
 7. **クライアントはここまで** → 投稿ボタンはない
 
-### あなた側（管理画面）
+### 管理画面
 
 1. **https://yifansun-ui.github.io/FS_Sticker/admin.html** を開く
 2. **GitHub PAT を入力**（Token フィールド）
@@ -94,32 +94,6 @@ https://yifansun-ui.github.io/FS_Sticker/
 - **同じブラウザのどのタブからでもアクセス可能**
 - **削除されるまで保持** → 複数回投稿できます
 - **GitHub に投稿済みのコメント** → ピンが緑色になる
-
-## FAQs
-
-### Q. クライアント側で投稿ボタンを見せたくない
-
-A. そのままでOK。「コメント追加」「表示/非表示」「名前入力」だけ見えます。
-
-### Q. 複数ページのLPでも使える？
-
-A. はい。各ページに `<script src="comments.js"></script>` を1行追加すれば、全ページで使えます。
-
-### Q. GitHub の Issues に自動ラベルを付けたい
-
-A. `admin.html` の `postOneToGitHub` 関数内で `labels: ["feedback"]` を追加してください。
-
-### Q. PAT をいちいち入力したくない
-
-A. `admin.html` の `TOKEN_KEY` をあなたのリポジトリに合わせれば、ブラウザに保存されます。
-
-### Q. 本番環境で使う場合、セキュリティは？
-
-A. Token が露出する可能性があるため、本番環境では以下を検討してください：
-- Netlify Functions などのサーバーレス関数経由で投稿
-- GitHub Actions で定期的に Issues を集約
-
-## トラブルシューティング
 
 ### コメント機能が出ない
 
