@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>LPコメント管理画面</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 24px; background: #f6f8fa; color: #24292e;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: #586069; font-size: 13px; margin-bottom: 20px; }
+  .info-box {
+    background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 6px;
+    padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #004085;
+  }
+  .upload-box {
+    background: #fff; border: 2px dashed #0366d6; border-radius: 8px;
+    padding: 20px; text-align: center; margin-bottom: 16px;
+  }
+  .upload-box input[type="file"] { display: none; }
+  .upload-box button {
+    background: #0366d6; color: #fff; border: none; padding: 10px 20px;
+    border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+  }
+  .upload-box button:hover { background: #0256c7; }
+  .stats {
+    background: #fff; border: 1px solid #e1e4e8; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+  }
+  .stats b { color: #0366d6; }
+  .actions {
+    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .actions button {
+    background: #28a745; color: #fff; border: none; padding: 8px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+  }
+  .actions button:hover { background: #218838; }
+  .actions button:disabled { background: #ccc; cursor: not-allowed; }
+  .item {
+    background: #fff; border: 1px solid #e1e4e8; border-radius: 6px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .num {
+    display: inline-block; width: 24px; height: 24px; background: #0366d6;
+    color: #fff; border-radius: 50%; text-align: center; line-height: 24px;
+    font-weight: bold; font-size: 11px; margin-right: 8px; vertical-align: middle;
+  }
+  .title { font-weight: 600; font-size: 13px; color: #24292e; display: inline; }
+  .meta { color: #586069; font-size: 12px; margin-top: 4px; }
+  .body { font-size: 13px; line-height: 1.5; margin: 6px 0; padding: 6px; background: #f9fafa; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
+  .item-actions {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+  .item-actions button {
+    background: #dc2626; color: #fff; border: none; padding: 5px 12px;
+    border-radius: 4px; cursor: pointer; font-size: 12px;
+  }
+  .item-actions button:hover { background: #cb2431; }
+  .empty {
+    text-align: center; padding: 40px 20px; color: #586069;
+    background: #fff; border-radius: 8px; border: 1px solid #e1e4e8;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>LPコメント管理画面</h1>
+  <div class="sub">JSON ファイルをアップロード → GitHub Issues を自動作成</div>
+
+  <div class="info-box">
+    💡 クライアント側で「📥 送信」ボタンをクリック → lp-feedback.json をダウンロード<br>
+    そのファイルをここにアップロード → Issues を自動作成します
+  </div>
+
+  <div class="upload-box">
+    <input type="file" id="file-input" accept=".json" />
+    <button onclick="document.getElementById('file-input').click()">📂 JSON ファイルを選択</button>
+    <div style="font-size: 12px; color: #666; margin-top: 8px;">
+      または、ファイルをドラッグ&ドロップ
+    </div>
+  </div>
+
+  <div style="margin-bottom: 20px;">
+    <label>GitHub Token（必須）</label>
+    <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxx" style="width: 100%; padding: 8px; border: 1px solid #e1e4e8; border-radius: 6px; font-size: 13px; margin-bottom: 4px;">
+    <div style="font-size: 11px; color: #999;">
+      Token は https://github.com/settings/tokens で作成（スコープ: repo）
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="create-btn" onclick="createIssues()" disabled>🚀 Issues を作成</button>
+  </div>
+
+  <div class="stats">
+    📊 ファイル内容: <span id="stats">ファイルが選択されていません</span>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+const fileInput = document.getElementById("file-input");
+const tokenInput = document.getElementById("token-input");
+const createBtn = document.getElementById("create-btn");
+const statsEl = document.getElementById("stats");
+const listEl = document.getElementById("list");
+
+let comments = [];
+
+// ドラッグ&ドロップ
+document.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+});
+
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const files = e.dataTransfer.files;
+  if (files.length) {
+    fileInput.files = files;
+    handleFileSelect();
+  }
+});
+
+fileInput.addEventListener("change", handleFileSelect);
+
+function handleFileSelect() {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      comments = JSON.parse(e.target.result);
+      if (!Array.isArray(comments)) comments = [];
+      
+      statsEl.textContent = `${comments.length}件のコメント`;
+      createBtn.disabled = false;
+      
+      render();
+    } catch (err) {
+      alert("JSON ファイルが正しくありません: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function render() {
+  if (!comments.length) {
+    listEl.innerHTML = '<div class="empty">コメントなし</div>';
+    return;
+  }
+
+  listEl.innerHTML = comments.map((c, i) => {
+    const date = new Date(c.createdAt).toLocaleString("ja-JP");
+    return `
+      <div class="item">
+        <div>
+          <span class="num">${i + 1}</span>
+          <span class="title">${escapeHTML(c.name || "匿名")}</span>
+        </div>
+        <div class="meta">${date}</div>
+        <div class="body">${escapeHTML(c.text)}</div>
+        <div class="meta">位置: ${c.x?.toFixed(1)}%, ${c.y?.toFixed(1)}% | ページ: ${c.url || "/"}</div>
+        <div class="item-actions">
+          <button onclick="deleteComment(${i})">削除</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function deleteComment(index) {
+  comments.splice(index, 1);
+  statsEl.textContent = `${comments.length}件のコメント`;
+  render();
+  if (!comments.length) createBtn.disabled = true;
+}
+
+async function createIssues() {
+  const token = tokenInput.value.trim();
+  if (!token) {
+    alert("Token を入力してください");
+    return;
+  }
+
+  if (!comments.length) {
+    alert("コメントがありません");
+    return;
+  }
+
+  if (!confirm(`${comments.length}件の Issue を作成します。よろしいですか？`)) {
+    return;
+  }
+
+  createBtn.disabled = true;
+  createBtn.textContent = "作成中…";
+
+  let created = 0;
+  for (const c of comments) {
+    const title = `[LPフィードバック] ${c.name || "匿名"}`;
+    const body = `**コメント内容：**
+${c.text}
+
+---
+投稿者: ${c.name || "匿名"}
+ページ位置: ${c.x?.toFixed(1)}%, ${c.y?.toFixed(1)}%
+ページ: ${c.url || "/"}
+`;
+
+    try {
+      const res = await fetch("https://api.github.com/repos/yifansun-ui/FS_Sticker/issues", {
+        method: "POST",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ title, body })
+      });
+
+      if (res.ok) {
+        created++;
+      } else {
+        const err = await res.json();
+        console.error("Error:", err);
+      }
+    } catch (e) {
+      console.error("Error:", e);
+    }
+
+    // API の レート制限を避けるため
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  createBtn.disabled = false;
+  createBtn.textContent = "🚀 Issues を作成";
+  alert(`${created}/${comments.length} 件の Issue を作成しました！\nhttps://github.com/yifansun-ui/FS_Sticker/issues で確認してください`);
+}
+
+function escapeHTML(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Token をローカルストレージに保存
+tokenInput.addEventListener("input", () => {
+  localStorage.setItem("admin-token", tokenInput.value);
+});
+
+// Token を復元
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("admin-token");
+  if (saved) tokenInput.value = saved;
+});
+</script>
+
+</body>
+</html>
